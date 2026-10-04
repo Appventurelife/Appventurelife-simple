@@ -138,8 +138,8 @@ html:has(.sheet.open),body:has(.sheet.open){overflow:hidden}
 .top2 h1{font-size:28px;color:#fff;line-height:1}
 .top2 .sec{color:#fff;border-color:rgba(255,255,255,.55);margin-left:auto;padding:6px 12px;font-size:14px}
 main{padding-bottom:120px}
-.mapwrap{margin-top:0}
-#map{height:46vh;min-height:300px}
+.mapwrap{margin-top:-30px}
+#map{height:52vh;min-height:320px}
 .locbtn{position:absolute;right:12px;top:12px;z-index:500}
 .crosshair{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-44px 0 0 -22px;z-index:600;pointer-events:none;filter:drop-shadow(0 3px 3px rgba(0,0,0,.45))}
 .placebar{position:absolute;left:10px;right:10px;bottom:12px;z-index:600;display:flex;gap:8px;align-items:center;background:var(--card);border-radius:14px;padding:10px 12px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
@@ -159,6 +159,7 @@ details.mas summary{cursor:pointer;font-weight:700;padding:6px 0}
 .sheet .fchip.on{background:var(--cta);color:var(--ctat);border-color:var(--cta)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 4px}
 .item small{display:block}
+.prevrow{display:flex;align-items:center;gap:10px;margin:8px 0 4px}
 .fotos{position:absolute;inset:0;pointer-events:none}
 .fo{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.4s}
 .fo.on{opacity:1}
@@ -182,13 +183,12 @@ details.mas summary{cursor:pointer;font-weight:700;padding:6px 0}
 </div>
 </div>
 
-<header class="top2">
-<svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><path d="M2 26L12 8l6 10 4-6 10 14z" fill="#fff"/><path d="M2 30c4-3 7 3 11 0s7 3 11 0 6 2 8 0" fill="none" stroke="#7FD0F5" stroke-width="2.5" stroke-linecap="round"/></svg>
-<h1>AppVentureLife</h1>
-<button id="yo" class="sec" type="button"></button>
-</header>
-
 <main>
+<header class="top">
+<div class="brand"><svg width="38" height="38" viewBox="0 0 34 34" aria-hidden="true"><path d="M2 26L12 8l6 10 4-6 10 14z" fill="#fff"/><path d="M2 30c4-3 7 3 11 0s7 3 11 0 6 2 8 0" fill="none" stroke="#7FD0F5" stroke-width="2.5" stroke-linecap="round"/></svg><h1>AppVentureLife</h1><button id="yo" class="sec" type="button" style="margin-left:auto;padding:6px 12px;font-size:14px"></button></div>
+<p class="sub">Descubre aventuras cerca de ti y súmate.</p>
+<svg class="topwave" viewBox="0 0 400 26" preserveAspectRatio="none" aria-hidden="true"><path d="M0 14q50-28 100 0t100 0t100 0t100 0V26H0z" fill="var(--bg)"/></svg>
+</header>
 <section id="vExplorar">
 <div class="mapwrap">
 <div id="map" role="application" aria-label="Mapa de planes"></div>
@@ -216,6 +216,9 @@ details.mas summary{cursor:pointer;font-weight:700;padding:6px 0}
 <h2>Nuevo plan</h2>
 <label for="f-titulo">¿Qué plan es?</label><input id="f-titulo" placeholder="Ej. Salida en moto de agua">
 <label>Tipo</label><div class="chips" id="f-tipos"></div>
+<label for="f-emoji">Emoji para la redondita del mapa</label>
+<input id="f-emoji" placeholder="Escribe uno o elige abajo" style="font-size:22px"><div class="cats" id="cats"></div><div class="emojis" id="emojis"></div>
+<div class="prevrow"><div id="pinprev"></div><span class="meta">Así se verá tu chincheta en el mapa</span></div>
 <div class="row">
 <div><label for="f-fecha">Cuándo</label><input id="f-fecha" type="datetime-local"></div>
 <div><label for="f-plazas">Plazas</label><input id="f-plazas" type="number" min="2" max="50" value="6"></div>
@@ -231,8 +234,6 @@ details.mas summary{cursor:pointer;font-weight:700;padding:6px 0}
 <label for="f-precio">Precio por persona en € (vacío = gratis)</label><input id="f-precio" type="number" min="0" step="0.5" inputmode="decimal" placeholder="Ej. 35">
 <label for="f-link">Enlace de pago de Stripe</label><input id="f-link" type="url" autocapitalize="none" placeholder="https://buy.stripe.com/...">
 <label for="f-pago">Otras formas de pago</label><input id="f-pago" maxlength="80" placeholder="Ej. Bizum al 600 000 000">
-<label for="f-emoji">Emoji de la chincheta</label>
-<input id="f-emoji" placeholder="Escribe uno o elige abajo" style="font-size:22px"><div class="cats" id="cats"></div><div class="emojis" id="emojis"></div>
 <div style="margin-top:10px"><label class="subir" for="f-foto" style="color:var(--ink);font-size:16px;margin:0">Añadir foto de portada</label><input id="f-foto" type="file" accept="image/*" hidden><img id="prev" alt="Vista previa" hidden></div>
 </details>
 <div class="row" style="margin-top:14px"><button class="sec" id="f-cancel" type="button">Cancelar</button><button id="f-ok" type="button">Publicar</button></div>
@@ -527,7 +528,8 @@ function marcaPunto(ll){
   else pendMarker=L.circleMarker(ll,{radius:12,color:"#17301F",weight:3,dashArray:"4 6",fillColor:"#FFD66B",fillOpacity:.9,interactive:false}).addTo(map);
 }
 function ponPunto(ll){marcaPunto(ll);colocando=true;$("colocar").hidden=false;$("colocarTxt").textContent="Plan en este punto";$("colocarOk").disabled=false}
-function pintaTipos(){$("f-tipos").innerHTML=Object.entries(TIPOS).map(([k,v])=>`<button type="button" class="fchip${tipoSel===k?" on":""}" data-k="${k}">${esc(v)}</button>`).join("")}
+function pintaPrev(){const c=$("f-tipo").value.trim(),t=c?norm(c):tipoSel,a={tipo:t,emoji:ultimo($("f-emoji").value)};$("pinprev").innerHTML=`<div class="pin" style="background:${col(a)}">${sym(a,22)}</div>`}
+function pintaTipos(){$("f-tipos").innerHTML=Object.entries(TIPOS).map(([k,v])=>`<button type="button" class="fchip${tipoSel===k?" on":""}" data-k="${k}">${esc(v)}</button>`).join("");pintaPrev()}
 function render(){
   capa.clearLayers();
   const advAll=vivos().filter(a=>a.kind!=="aqui");
@@ -634,6 +636,9 @@ $("f-ok").onclick=()=>{
   map.setView([a.lat,a.lng],14);elegir(a.id);
 };
 pintaTipos();
+$("f-emoji").addEventListener("input",pintaPrev);
+$("emojis").addEventListener("click",()=>setTimeout(pintaPrev,0));
+$("f-tipo").addEventListener("input",pintaPrev);
 dbp.then(()=>mediaAll()).then(m=>{media=m;render()}).catch(()=>{});
 render();
 importaEnlace();
