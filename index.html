@@ -159,10 +159,17 @@ details.mas summary{cursor:pointer;font-weight:700;padding:6px 0}
 .sheet .fchip.on{background:var(--cta);color:var(--ctat);border-color:var(--cta)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 4px}
 .item small{display:block}
+.fotos{position:absolute;inset:0;pointer-events:none}
+.fo{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.4s}
+.fo.on{opacity:1}
+.welcome.con-fotos::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(10,42,94,.5),rgba(10,42,94,.78))}
+.welcome.con-fotos .sun,.welcome.con-fotos .bg{display:none}
+.welcome .wc,.welcome .waves{z-index:2}
 </style>
 </head>
 <body>
 <div id="bienvenida" class="welcome">
+<div class="fotos" id="fotos" aria-hidden="true"></div>
 <div class="sun"></div>
 <svg class="bg" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true"><path d="M0 200V100l55-55 45 45 55-70 70 80 45-40 130 90v50z" fill="#4A90E2" opacity=".5"/><path d="M0 200v-70l80-45 65 50 85-65 80 65 90-30v95z" fill="#0D3470"/></svg>
 <div class="waves"><svg viewBox="0 0 800 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 28q50-30 100 0t100 0t100 0t100 0t100 0t100 0t100 0t100 0V60H0z" fill="#5BC0EB" opacity=".9"/></svg></div>
@@ -187,9 +194,10 @@ details.mas summary{cursor:pointer;font-weight:700;padding:6px 0}
 <div id="map" role="application" aria-label="Mapa de planes"></div>
 <button id="loc" type="button" class="round locbtn" aria-label="Mi ubicación"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
 <svg id="centro" class="crosshair" viewBox="0 0 24 24" hidden aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 10-14 0c0 5.8 7 12 7 12z" fill="#FFD66B" stroke="#0A2A5E" stroke-width="1.6"/><circle cx="12" cy="10" r="2.6" fill="#0A2A5E"/></svg>
-<div id="colocar" class="placebar" hidden><span>Mueve el mapa hasta el lugar</span><button id="colocarNo" class="sec" type="button">Cancelar</button><button id="colocarOk" type="button">Aquí</button></div>
+<div id="colocar" class="placebar" hidden><span id="colocarTxt">Toca el mapa para marcar el lugar</span><button id="colocarNo" class="sec" type="button" aria-label="Cancelar">✕</button><button id="colocarOk" type="button" disabled>Crear plan aquí</button></div>
 <div class="attr">&copy; OpenStreetMap</div>
 </div>
+<p class="hint" style="margin:8px 2px 0">Toca el mapa para crear un plan en ese punto, o una chincheta para ver un plan.</p>
 <div id="filtros"></div>
 <div id="lista" class="list"></div>
 </section>
@@ -288,7 +296,8 @@ function seguridad(a){
 const wx={};
 const WMO=c=>c===0?["☀️","Despejado"]:c<=2?["🌤️","Poco nuboso"]:c===3?["☁️","Nublado"]:c<=48?["🌫️","Niebla"]:c<=57?["🌦️","Llovizna"]:c<=67?["🌧️","Lluvia"]:c<=77?["🌨️","Nieve"]:c<=82?["🌧️","Chubascos"]:["⛈️","Tormenta"];
 function tiempoHTML(a){
-  if(!a.fecha||!isFinite(a.lat)||!isFinite(a.lng))return "";
+  if(!isFinite(a.lat)||!isFinite(a.lng))return "";
+  if(!a.fecha)return ahoraHTML(a);
   const dias=(tF(a)-Date.now())/864e5;
   if(dias<-0.2)return "";
   if(dias>15)return `<p class="meta wx">El pronóstico aparecerá cuando falten menos de 16 días.</p>`;
@@ -297,6 +306,32 @@ function tiempoHTML(a){
   if(c&&c.err)return "";
   if(!c){wx[key]={};pideTiempo(a,key)}
   return `<p class="meta wx">Consultando el tiempo…</p>`;
+}
+function ahoraHTML(a){
+  const key="ahora|"+a.id;let c=wx[key];
+  if(c&&c.t&&Date.now()-c.t>12e5){delete wx[key];c=null}
+  if(c&&c.html)return c.html;
+  if(c&&c.err)return "";
+  if(!c){wx[key]={};pideAhora(a,key)}
+  return `<p class="meta wx">Consultando el tiempo…</p>`;
+}
+async function pideAhora(a,key){
+  try{
+    const ll=`latitude=${a.lat.toFixed(3)}&longitude=${a.lng.toFixed(3)}`;
+    const r=await (await fetch(`https://api.open-meteo.com/v1/forecast?${ll}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`)).json();
+    const c=r.current,[em,tx]=WMO(c.weather_code);
+    let html=`<b>${em} ${tx}</b> · ${Math.round(c.temperature_2m)}°C · viento ${Math.round(c.wind_speed_10m)} km/h`;
+    let ola=null;
+    if(AGUA(a)){try{const m=await (await fetch(`https://marine-api.open-meteo.com/v1/marine?${ll}&current=wave_height&timezone=auto`)).json();if(m.current&&m.current.wave_height!=null)ola=m.current.wave_height}catch(e){}}
+    if(ola!=null)html+=` · olas ${ola.toFixed(1)} m`;
+    const av=[];
+    if(c.weather_code>=95)av.push("tormenta");
+    if(c.wind_speed_10m>=30)av.push("viento fuerte");else if(c.wind_speed_10m>=20&&AGUA(a))av.push("viento moderado");
+    if(ola!=null&&ola>=1.5)av.push("mar con oleaje");
+    if(av.length)html+=`<br><span class="warn">Atención: ${av.join(", ")}.</span>`;
+    wx[key]={html:`<p class="meta wx">Tiempo ahora en el lugar<br>${html}</p>`,t:Date.now()};
+  }catch(e){wx[key]={err:1,t:Date.now()}}
+  if(sel===a.id&&tab==="info")render();
 }
 async function pideTiempo(a,key){
   try{
@@ -314,7 +349,7 @@ async function pideTiempo(a,key){
     if((lluvia||0)>=60)av.push("alta probabilidad de lluvia");
     if(ola!=null&&ola>=1.5)av.push("mar con oleaje");
     if(av.length)html+=`<br><span class="warn">Atención: ${av.join(", ")}.</span>`;
-    wx[key]={html:`<p class="meta wx">${html}</p>`};
+    wx[key]={html:`<p class="meta wx">Tiempo previsto<br>${html}</p>`};
   }catch(e){wx[key]={err:1}}
   if(sel===a.id&&tab==="info")render();
 }
@@ -398,6 +433,13 @@ $("p-ok").onclick=()=>{const n=$("p-nombre").value.trim();if(!n){$("p-nombre").f
 $("p-cancel").onclick=()=>{$("perfil").classList.remove("open");cbNombre=null};
 pintaYo();
 $("wicons").innerHTML=["moto","ruta","bici","surf","escalada"].map(k=>`<span>${icon(k,24)}</span>`).join("");
+/* fotos reales de portada: sube portada1.jpg, portada2.jpg... al repositorio y salen solas */
+const PORTADA=["portada1.jpg","portada2.jpg","portada3.jpg","portada4.jpg","portada5.jpg"];
+(()=>{
+  const box=$("fotos");let n=0,cur=0;
+  PORTADA.forEach(src=>{const im=new Image();im.onload=()=>{const d=document.createElement("div");d.className="fo";d.style.backgroundImage=`url("${src}")`;box.appendChild(d);n++;if(n===1){d.classList.add("on");$("bienvenida").classList.add("con-fotos")}};im.src=src});
+  setInterval(()=>{const f=box.children;if(!f||f.length<2)return;f[cur].classList.remove("on");cur=(cur+1)%f.length;f[cur].classList.add("on")},5500);
+})();
 $("entrar").onclick=()=>{$("bienvenida").classList.add("out");setTimeout(()=>$("bienvenida").hidden=true,420);map.invalidateSize()};
 
 /* galería de fotos y vídeos (se guardan en el móvil con IndexedDB) */
@@ -478,7 +520,13 @@ function irA(v){
   else{$("bMios").classList.add("on");$("bExp").classList.remove("on");salirColocar()}
   window.scrollTo(0,0);render();
 }
-function salirColocar(){colocando=false;$("centro").hidden=true;$("colocar").hidden=true}
+function salirColocar(){colocando=false;$("centro").hidden=true;$("colocar").hidden=true;if(pendMarker){map.removeLayer(pendMarker);pendMarker=null}}
+function marcaPunto(ll){
+  pend=ll;
+  if(pendMarker)pendMarker.setLatLng(ll);
+  else pendMarker=L.circleMarker(ll,{radius:12,color:"#17301F",weight:3,dashArray:"4 6",fillColor:"#FFD66B",fillOpacity:.9,interactive:false}).addTo(map);
+}
+function ponPunto(ll){marcaPunto(ll);colocando=true;$("colocar").hidden=false;$("colocarTxt").textContent="Plan en este punto";$("colocarOk").disabled=false}
 function pintaTipos(){$("f-tipos").innerHTML=Object.entries(TIPOS).map(([k,v])=>`<button type="button" class="fchip${tipoSel===k?" on":""}" data-k="${k}">${esc(v)}</button>`).join("")}
 function render(){
   capa.clearLayers();
@@ -492,7 +540,7 @@ function render(){
     const ic=L.divIcon({className:"",html:`<div class="pin${a.id===sel?" sel":""}" style="background:${col(a)}">${sym(a,22)}</div>`,iconSize:[44,44],iconAnchor:[22,22]});
     L.marker([a.lat,a.lng],{icon:ic}).on("click",()=>elegir(a.id)).addTo(capa);
   });
-  const card=a=>`<div class="item${pasada(a)?" past":""}" data-id="${a.id}"><div class="th" style="background:${col(a)}">${a.foto?`<img src="${a.foto}" alt="">`:sym(a,28)}</div><div style="flex:1;min-width:0"><b>${esc(a.titulo)}</b><small>${esc(textoCuando(a))}${pasada(a)?" (terminado)":""} · ${a.asist.length}/${a.max} personas${a.precio>0?" · "+precioTxt(a.precio):""}</small></div>${mia(a)?`<span class="tag">Apuntado</span>`:""}</div>`;
+  const card=a=>`<div class="item${pasada(a)?" past":""}" data-id="${a.id}"><div class="th" style="background:${col(a)}">${a.foto?`<img src="${a.foto}" alt="">`:sym(a,28)}</div><div style="flex:1;min-width:0"><b>${esc(a.titulo)}</b><small>${esc(textoCuando(a))}${pasada(a)?" (terminado)":""} · ${a.asist.length}/${a.max} personas${a.nivel&&a.nivel!=="Todos los niveles"?" · "+esc(a.nivel):""}${a.precio>0?" · "+precioTxt(a.precio):""}</small></div>${mia(a)?`<span class="tag">Apuntado</span>`:""}</div>`;
   $("lista").innerHTML=adv.length?adv.map(card).join(""):`<p class="meta">No hay planes con estos filtros. Pulsa + para crear uno.</p>`;
   const mios=advAll.filter(mia).sort(orden);
   $("listaMios").innerHTML=mios.length?mios.map(card).join(""):`<p class="meta">Aún no tienes planes. Apúntate a uno o crea el tuyo con el botón +.</p>`;
@@ -513,19 +561,17 @@ function render(){
   }else{
     body=`<h2>${esc(a.titulo)}</h2>
 <p class="meta">${esc(TIPOS[a.tipo]||a.tipo)} · ${esc(textoCuando(a))}${a.precio>0?" · "+precioTxt(a.precio)+" por persona":""}</p>
-${a.punto?`<p class="meta">Punto de encuentro: <b style="color:var(--ink)">${esc(a.punto)}</b></p>`:""}
-${tiempoHTML(a)}
-${quien(a)}
 <button id="unir" class="big" ${lleno?"disabled":""}>${yo?"Salir del plan":lleno?"Completo":quedan===1?"Apuntarme · queda 1 plaza":"Apuntarme"}</button>
 <div class="mini"><button id="gochat" class="sec" type="button">Chat${a.chat.length?" ("+a.chat.length+")":""}</button><button id="gofotos" class="sec" type="button">Fotos${ms.length?" ("+ms.length+")":""}</button><button id="wa" class="sec" type="button">WhatsApp</button>${a.fecha?`<button id="cal" class="sec" type="button">Calendario</button>`:""}</div>
-${a.precio>0?`<div class="pay"><b>${precioTxt(a.precio)} por persona</b>${a.link?`<br><a class="payb" href="${esc(a.link)}" target="_blank" rel="noopener noreferrer">Pagar con Stripe</a>`:""}${a.pago?`<p class="meta" style="margin:6px 0 0">Otras formas de pago: ${esc(a.pago)}</p>`:""}${yo&&a.org!==me&&!(a.pagos||[]).includes(me)?`<br><button id="yapague" class="sec" type="button" style="margin-top:8px">Ya he pagado</button>`:""}${a.org===me?`<p class="meta" style="margin:8px 0 0">Cobrado: ${npag(a)} de ${a.asist.length} (${precioTxt(npag(a)*a.precio)}). Toca a una persona de la lista para marcar que ha pagado.</p>`:""}</div>`:""}
-<details class="mas"><summary>Más información</summary>
 ${a.nivel?`<p class="meta"><span class="chip"><i style="background:${NIVC[a.nivel]||"#7B8A80"}"></i>${esc(a.nivel)}</span></p>`:""}
+${a.punto?`<p class="meta">Punto de encuentro: <b style="color:var(--ink)">${esc(a.punto)}</b></p>`:""}
 ${a.equipo?`<p class="meta">Equipo: <b style="color:var(--ink)">${esc(a.equipo)}</b></p>`:""}
 ${a.desc?`<p style="margin:0 0 12px;white-space:pre-wrap">${esc(a.desc)}</p>`:""}
+${tiempoHTML(a)}
+${a.precio>0?`<div class="pay"><b>${precioTxt(a.precio)} por persona</b>${a.link?`<br><a class="payb" href="${esc(a.link)}" target="_blank" rel="noopener noreferrer">Pagar con Stripe</a>`:""}${a.pago?`<p class="meta" style="margin:6px 0 0">Otras formas de pago: ${esc(a.pago)}</p>`:""}${yo&&a.org!==me&&!(a.pagos||[]).includes(me)?`<br><button id="yapague" class="sec" type="button" style="margin-top:8px">Ya he pagado</button>`:""}${a.org===me?`<p class="meta" style="margin:8px 0 0">Cobrado: ${npag(a)} de ${a.asist.length} (${precioTxt(npag(a)*a.precio)}). Toca a una persona de la lista para marcar que ha pagado.</p>`:""}</div>`:""}
+${quien(a)}
 ${seguridad(a)}
-<div class="acts"><button id="copiar" class="sec" type="button">Copiar enlace</button>${a.org===me?`<button id="del" class="sec" type="button">Eliminar plan</button>`:""}</div>
-</details>`;
+<div class="acts"><button id="copiar" class="sec" type="button">Copiar enlace</button>${a.org===me?`<button id="del" class="sec" type="button">Eliminar plan</button>`:""}</div>`;
   }
   d.innerHTML=`<div class="grab"></div><button class="x" type="button" aria-label="Cerrar">✕</button>${tab==="info"?cover:""}${body}`;
   d.classList.add("open");
@@ -547,18 +593,22 @@ ${seguridad(a)}
     const m=$("msgs");m.scrollTop=m.scrollHeight;
   }
 }
-function cerrarForm(){pend=null;foto="";$("prev").hidden=true;$("f-foto").value="";$("nueva").classList.remove("open")}
+function cerrarForm(){pend=null;foto="";colocando=false;$("colocar").hidden=true;if(pendMarker){map.removeLayer(pendMarker);pendMarker=null}$("prev").hidden=true;$("f-foto").value="";$("nueva").classList.remove("open")}
 function elegir(id){tab="info";delId=null;cerrarForm();sel=id;render()}
 
-map.on("click",()=>{if(colocando)return;if(sel){sel=null;render()}});
+map.on("click",e=>{
+  if($("nueva").classList.contains("open")){marcaPunto(e.latlng);return}
+  if(sel){sel=null;render();return}
+  ponPunto(e.latlng);
+});
 $("lista").addEventListener("click",e=>{const i=e.target.closest(".item");if(i){const a=data.find(x=>x.id===+i.dataset.id);if(a)map.setView([a.lat,a.lng],14);elegir(+i.dataset.id)}});
 $("listaMios").addEventListener("click",e=>{const i=e.target.closest(".item");if(i){const a=data.find(x=>x.id===+i.dataset.id);irA("explorar");if(a)map.setView([a.lat,a.lng],14);elegir(+i.dataset.id)}});
 $("filtros").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.r){filtro="";fFecha=""}else if(b.dataset.d!==undefined){fFecha=fFecha===b.dataset.d?"":b.dataset.d}else{filtro=filtro===b.dataset.f?"":b.dataset.f}render()};
 $("bExp").onclick=()=>irA("explorar");
 $("bMios").onclick=()=>irA("mios");
-$("crearBtn").onclick=()=>{irA("explorar");sel=null;cerrarForm();render();colocando=true;$("centro").hidden=false;$("colocar").hidden=false;$("map").scrollIntoView({behavior:"smooth",block:"center"})};
-$("colocarNo").onclick=salirColocar;
-$("colocarOk").onclick=()=>{pend=map.getCenter();salirColocar();$("nueva").classList.add("open")};
+$("crearBtn").onclick=()=>{irA("explorar");sel=null;cerrarForm();render();colocando=true;$("colocar").hidden=false;$("colocarTxt").textContent="Toca el mapa para marcar el lugar";$("colocarOk").disabled=true;$("map").scrollIntoView({behavior:"smooth",block:"center"})};
+$("colocarNo").onclick=()=>{salirColocar();pend=null};
+$("colocarOk").onclick=()=>{if(!pend)return;colocando=false;$("colocar").hidden=true;$("nueva").classList.add("open")};
 $("f-tipos").onclick=e=>{const b=e.target.closest("button");if(b){tipoSel=b.dataset.k;pintaTipos()}};
 $("f-cancel").onclick=cerrarForm;
 $("f-foto").onchange=e=>{
